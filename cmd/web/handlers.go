@@ -1,8 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"html/template"
+	"github.com/schalkwv/snippetbox/internal/models"
 	"net/http"
 	"strconv"
 )
@@ -13,27 +14,39 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	files := []string{
-		"./ui/html/base.html",
-		"./ui/html/pages/home.html",
-		"./ui/html/partials/nav.html",
-	}
-
-	ts, err := template.ParseFiles(files...)
+	snippets, err := app.snippets.Latest()
 	if err != nil {
-		app.errorLog.Print(err.Error())
-		//http.Error(w, "Internal Server Error", 500)
 		app.serverError(w, err)
 		return
 	}
 
-	err = ts.ExecuteTemplate(w, "base", nil)
-	if err != nil {
-		//app.errorLog.Print(err.Error())
-		//http.Error(w, "Internal Server Error", 500)
-		app.serverError(w, err)
-		return
+	for _, snippet := range snippets {
+		fmt.Fprintf(w, "%+v\n", snippet)
 	}
+
+	/*
+		files := []string{
+			"./ui/html/base.html",
+			"./ui/html/pages/home.html",
+			"./ui/html/partials/nav.html",
+		}
+
+		ts, err := template.ParseFiles(files...)
+		if err != nil {
+			app.errorLog.Print(err.Error())
+			//http.Error(w, "Internal Server Error", 500)
+			app.serverError(w, err)
+			return
+		}
+
+		err = ts.ExecuteTemplate(w, "base", nil)
+		if err != nil {
+			//app.errorLog.Print(err.Error())
+			//http.Error(w, "Internal Server Error", 500)
+			app.serverError(w, err)
+			return
+		}
+	*/
 }
 
 func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +56,18 @@ func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "Display a specific snippet with ID %d...", id)
+	snippet, err := app.snippets.Get(id)
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			app.notFound(w)
+		} else {
+			app.serverError(w, err)
+		}
+		return
+	}
+
+	// Write the snippet data as a plain-text HTTP response body.
+	fmt.Fprintf(w, "%+v", snippet)
 }
 
 func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
