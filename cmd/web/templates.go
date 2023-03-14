@@ -2,7 +2,9 @@ package main
 
 import (
 	"github.com/schalkwv/snippetbox/internal/models"
+	"github.com/schalkwv/snippetbox/ui"
 	"html/template"
+	"io/fs"
 	"path/filepath"
 	"time"
 )
@@ -33,7 +35,8 @@ func newTemplateCache() (map[string]*template.Template, error) {
 	// match the pattern "./ui/html/pages/*.html". This will essentially give
 	// us a slice of all the filepaths for our application 'page' templates
 	// like: [ui/html/pages/home.html ui/html/pages/view.html]
-	pages, err := filepath.Glob("./ui/html/pages/*.html")
+	//pages, err := filepath.Glob("./ui/html/pages/*.html")
+	pages, err := fs.Glob(ui.Files, "html/pages/*.html")
 	if err != nil {
 		return nil, err
 	}
@@ -44,25 +47,20 @@ func newTemplateCache() (map[string]*template.Template, error) {
 		// and assign it to the name variable.
 		name := filepath.Base(page)
 
-		ts, err := template.New(name).Funcs(functions).ParseFiles("./ui/html/base.html")
+		// Create a slice containing the filepath patterns for the templates we
+		// want to parse.
+		patterns := []string{
+			"html/base.html",
+			"html/partials/*.html",
+			page,
+		}
+
+		// Use ParseFS() instead of ParseFiles() to parse the template files
+		// from the ui.Files embedded filesystem.
+		ts, err := template.New(name).Funcs(functions).ParseFS(ui.Files, patterns...)
 		if err != nil {
 			return nil, err
 		}
-
-		// Call ParseGlob() *on this template set* to add any partials.
-		ts, err = ts.ParseGlob("./ui/html/partials/*.html")
-		if err != nil {
-			return nil, err
-		}
-
-		// Call ParseFiles() *on this template set* to add the  page template.
-		ts, err = ts.ParseFiles(page)
-		if err != nil {
-			return nil, err
-		}
-
-		// Add the template set to the map, using the name of the page
-		// (like 'home.tmpl') as the key.
 		cache[name] = ts
 	}
 
